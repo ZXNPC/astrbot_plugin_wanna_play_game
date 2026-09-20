@@ -13,5 +13,11 @@
     "description": "单个来源的请求总超时（秒）",
     "type": "int",
     "default": 60
+  },
+  "enable_nl_trigger": {
+    "description": "允许「我想玩 xxx」自然语言触发",
+    "type": "bool",
+    "default": false,
+    "hint": "关闭（默认）时只响应 /game xxx 命令，避免「我想玩点好玩的」这类闲聊被当成游戏名；开启后「我想玩 xxx」「我要玩 xxx」与 /game xxx 等效。"
   }
 }

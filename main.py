@@ -1,6 +1,5 @@
 """AstrBot 插件：根据你想玩的游戏，从 gamer520.com 与 online-fix.me 查找下载信息。"""
 
-import re
 import traceback
 from pathlib import Path
 from typing import Optional
@@ -13,11 +12,16 @@ from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 from .app.cache import SearchCache
 from .app.formatter import format_report
 from .app.service import GameDownloadService
+from .app.trigger import (
+    NL_REGEX,
+    parse_command_text,
+    parse_natural_language_text,
+)
 
 PLUGIN_NAME = "astrbot_plugin_wanna_play_game"
 PLUGIN_AUTHOR = "ZXNPC"
 PLUGIN_DESC = "根据你想玩的游戏，从 gamer520.com 与 online-fix.me 查找下载信息"
-PLUGIN_VERSION = "v1.0.0"
+PLUGIN_VERSION = "v1.1.0"
 PLUGIN_REPO = "https://github.com/ZXNPC/astrbot_plugin_wanna_play_game"
 
 CACHE_CLEAR_PHRASE = "清空游戏检索缓存"
@@ -27,11 +31,8 @@ CACHE_CLEARED_MESSAGE = (
     "适合游戏资源更新后需要强制刷新结果时使用。"
 )
 
-# 自然语言入口：我想玩 X / 我要玩 X
-NL_PATTERN = r"^(?:我想玩(?:一下)?|我要玩)\s*[:：]?\s*(.+?)[。！？!?.,，\s]*$"
-NL_REGEX = re.compile(NL_PATTERN)
-# AstrBot 会剥掉 wake_prefix（默认 "/"），所以指令正文可能是 "game xxx" 或 "/game xxx"
-CMD_REGEX = re.compile(r"^(?:/)?game\s+(.+?)\s*$", re.IGNORECASE)
+# 自然语言入口默认关闭：避免「我想玩点好玩的」这类闲聊被解析成游戏名并触发检索。
+DEFAULT_NL_TRIGGER = False
 
 
 @register(PLUGIN_NAME, PLUGIN_AUTHOR, PLUGIN_DESC, PLUGIN_VERSION, repo=PLUGIN_REPO)
@@ -43,18 +44,16 @@ class WannaPlayGameDownload(Star):
         ttl_hours = float((config or {}).get("cache_ttl", 24))
         self.cache = SearchCache(data_dir / "cache.json", ttl_seconds=ttl_hours * 3600)
         self.service = GameDownloadService(config or {}, self.cache)
+        self.nl_trigger_enabled = bool(
+            (config or {}).get("enable_nl_trigger", DEFAULT_NL_TRIGGER)
+        )
 
     @filter.command("game")
     async def game_command(self, event: AstrMessageEvent):
         """按 /game <游戏名> 查找下载信息，或按 /game 清空游戏检索缓存。"""
-        text = (event.message_str or "").strip()
-        m = CMD_REGEX.match(text)
-        command_text = m.group(1).strip() if m else ""
+        command_text = parse_command_text(event.message_str or "")
         if not command_text:
-            yield event.plain_result(
-                "用法：/game 游戏名，例如 /game 赛博朋克2077；也可以直接发送「我想玩赛博朋克2077」。"
-                "清空缓存请发送 /game 清空游戏检索缓存。"
-            )
+            yield event.plain_result(self._usage_message())
             return
         if command_text == CACHE_CLEAR_PHRASE:
             try:
@@ -69,14 +68,20 @@ class WannaPlayGameDownload(Star):
 
     @filter.regex(NL_REGEX)
     async def game_natural_language(self, event: AstrMessageEvent):
-        """匹配「我想玩 xxx」「我要玩 xxx」等自然语言表达。"""
-        m = NL_REGEX.search((event.get_message_str() or "").strip())
-        if not m:
+        """匹配「我想玩 xxx」「我要玩 xxx」；仅在配置开启自然语言入口时生效。"""
+        if not self.nl_trigger_enabled:
             return
-        game_name = m.group(1).strip()
+        game_name = parse_natural_language_text(event.get_message_str() or "")
         if not game_name:
             return
         yield event.plain_result(await self._search_and_reply(game_name))
+
+    def _usage_message(self) -> str:
+        message = "用法：/game 游戏名，例如 /game 赛博朋克2077。"
+        if self.nl_trigger_enabled:
+            message += "也可以直接发送「我想玩赛博朋克2077」。"
+        message += "清空缓存请发送 /game 清空游戏检索缓存。"
+        return message
 
     async def _search_and_reply(self, game_name: str) -> str:
         try:
