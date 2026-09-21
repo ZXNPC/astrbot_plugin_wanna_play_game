@@ -21,7 +21,7 @@ from .app.trigger import (
 PLUGIN_NAME = "astrbot_plugin_wanna_play_game"
 PLUGIN_AUTHOR = "ZXNPC"
 PLUGIN_DESC = "根据你想玩的游戏，从 gamer520.com 与 online-fix.me 查找下载信息"
-PLUGIN_VERSION = "v1.1.0"
+PLUGIN_VERSION = "v1.1.1"
 PLUGIN_REPO = "https://github.com/ZXNPC/astrbot_plugin_wanna_play_game"
 
 CACHE_CLEAR_PHRASE = "清空游戏检索缓存"

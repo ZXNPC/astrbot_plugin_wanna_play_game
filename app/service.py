@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from dataclasses import dataclass, field
 
 from . import gamer520, online_fix
@@ -11,8 +10,6 @@ from .cache import SearchCache
 from .http_client import build_client
 from .matcher import normalize, rank_hits
 from .result import candidate_from_dict, candidate_to_dict
-
-logger = logging.getLogger(__name__)
 
 # 解析策略变更时递增，避免命中上一版缓存的旧链接结构。
 SEARCH_CACHE_VERSION = 2
